@@ -22,6 +22,7 @@ interface CategoryData {
   ventas: string;
   costo: string;
   mermas: string;
+  stock: string;
 }
 
 const CATEGORIES: { key: CategoryKey; label: string; icon: React.ElementType; color: string }[] = [
@@ -34,11 +35,11 @@ const CATEGORIES: { key: CategoryKey; label: string; icon: React.ElementType; co
 
 export default function App() {
   const [categories, setCategories] = useState<Record<CategoryKey, CategoryData>>({
-    res: { ventas: '', costo: '', mermas: '' },
-    cerdo: { ventas: '', costo: '', mermas: '' },
-    pollo: { ventas: '', costo: '', mermas: '' },
-    achuras: { ventas: '', costo: '', mermas: '' },
-    huevos: { ventas: '', costo: '', mermas: '' },
+    res: { ventas: '', costo: '', mermas: '', stock: '' },
+    cerdo: { ventas: '', costo: '', mermas: '', stock: '' },
+    pollo: { ventas: '', costo: '', mermas: '', stock: '' },
+    achuras: { ventas: '', costo: '', mermas: '', stock: '' },
+    huevos: { ventas: '', costo: '', mermas: '', stock: '' },
   });
 
   const [generales, setGenerales] = useState({
@@ -67,23 +68,33 @@ export default function App() {
     const ventas = getNum(data.ventas);
     const costo = getNum(data.costo);
     const mermas = getNum(data.mermas);
+    const stock = getNum(data.stock);
     
-    const gananciaBruta = ventas - (costo + mermas);
-    const margenBruto = ventas > 0 ? (gananciaBruta / ventas) * 100 : 0;
+    const gananciaBrutaReal = ventas - (costo + mermas);
+    const gananciaBrutaPotencial = (ventas + stock) - (costo + mermas);
+    const margenBrutoReal = ventas > 0 ? (gananciaBrutaReal / ventas) * 100 : 0;
+    const margenBrutoPotencial = (ventas + stock) > 0 ? (gananciaBrutaPotencial / (ventas + stock)) * 100 : 0;
 
     return {
       ...cat,
       ventas,
       costo,
       mermas,
-      gananciaBruta,
-      margenBruto
+      stock,
+      gananciaBrutaReal,
+      gananciaBrutaPotencial,
+      margenBrutoReal,
+      margenBrutoPotencial
     };
   });
 
   // Total Calculations
-  const ingresosBrutosTotales = categoryResults.reduce((sum, cat) => sum + cat.ventas, 0);
-  const gananciaBrutaTotal = categoryResults.reduce((sum, cat) => sum + cat.gananciaBruta, 0);
+  const ingresosRealesTotales = categoryResults.reduce((sum, cat) => sum + cat.ventas, 0);
+  const stockTotal = categoryResults.reduce((sum, cat) => sum + cat.stock, 0);
+  const ingresosPotencialesTotales = ingresosRealesTotales + stockTotal;
+
+  const gananciaBrutaRealTotal = categoryResults.reduce((sum, cat) => sum + cat.gananciaBrutaReal, 0);
+  const gananciaBrutaPotencialTotal = categoryResults.reduce((sum, cat) => sum + cat.gananciaBrutaPotencial, 0);
   
   const costosOperativosTotales = 
     getNum(generales.servicios) + 
@@ -91,9 +102,15 @@ export default function App() {
     getNum(generales.insumos) + 
     getNum(generales.mantenimiento);
 
-  const gananciaNetaTotal = gananciaBrutaTotal - costosOperativosTotales;
-  const margenRentabilidadNeta = ingresosBrutosTotales > 0 
-    ? (gananciaNetaTotal / ingresosBrutosTotales) * 100 
+  const gananciaNetaRealTotal = gananciaBrutaRealTotal - costosOperativosTotales;
+  const gananciaNetaPotencialTotal = gananciaBrutaPotencialTotal - costosOperativosTotales;
+
+  const margenRentabilidadNetaReal = ingresosRealesTotales > 0 
+    ? (gananciaNetaRealTotal / ingresosRealesTotales) * 100 
+    : 0;
+  
+  const margenRentabilidadNetaPotencial = ingresosPotencialesTotales > 0 
+    ? (gananciaNetaPotencialTotal / ingresosPotencialesTotales) * 100 
     : 0;
 
   const formatCurrency = (val: number) => {
@@ -158,27 +175,35 @@ export default function App() {
                       {/* Category Quick Results */}
                       <div className="flex items-center space-x-4 text-sm">
                         <div className="text-right hidden sm:block">
-                          <p className="text-stone-500 text-xs uppercase font-semibold">Ganancia Bruta</p>
-                          <p className={`font-bold ${cat.gananciaBruta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {formatCurrency(cat.gananciaBruta)}
+                          <p className="text-stone-500 text-xs uppercase font-semibold">Ganancia Real</p>
+                          <p className={`font-bold ${cat.gananciaBrutaReal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatCurrency(cat.gananciaBrutaReal)}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-stone-500 text-xs uppercase font-semibold">Margen</p>
-                          <p className={`font-bold px-2 py-0.5 rounded ${cat.margenBruto >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {formatPercent(cat.margenBruto)}
+                          <p className="text-stone-500 text-xs uppercase font-semibold">Margen Potencial</p>
+                          <p className={`font-bold px-2 py-0.5 rounded ${cat.margenBrutoPotencial >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {formatPercent(cat.margenBrutoPotencial)}
                           </p>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <InputField 
-                        label="Ventas Totales"
+                        label="Ventas Reales"
                         description={cat.key === 'res' ? 'ingresos de venta de carne' : `Ingresos por venta de ${cat.label.toLowerCase()}.`}
                         value={categories[cat.key].ventas}
                         onChange={(v) => handleCategoryChange(cat.key, 'ventas', v)}
                         icon={TrendingUp}
+                        color="emerald"
+                      />
+                      <InputField 
+                        label="Stock (Valor Venta)"
+                        description="Valor estimado de mercadería aún no vendida."
+                        value={categories[cat.key].stock}
+                        onChange={(v) => handleCategoryChange(cat.key, 'stock', v)}
+                        icon={Package}
                         color="emerald"
                       />
                       <InputField 
@@ -200,9 +225,15 @@ export default function App() {
                     {/* Mobile Category Results (visible only on small screens) */}
                     <div className="sm:hidden bg-stone-50 p-4 border-t border-stone-100 flex justify-between items-center">
                        <div>
-                          <p className="text-stone-500 text-xs uppercase font-semibold">Ganancia Bruta</p>
-                          <p className={`font-bold ${cat.gananciaBruta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {formatCurrency(cat.gananciaBruta)}
+                          <p className="text-stone-500 text-xs uppercase font-semibold">Ganancia Real</p>
+                          <p className={`font-bold ${cat.gananciaBrutaReal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatCurrency(cat.gananciaBrutaReal)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-stone-500 text-xs uppercase font-semibold">Margen Potencial</p>
+                          <p className={`font-bold ${cat.margenBrutoPotencial >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatPercent(cat.margenBrutoPotencial)}
                           </p>
                         </div>
                     </div>
@@ -264,18 +295,31 @@ export default function App() {
               
               <div className="space-y-6">
                 <ResultRowDark 
-                  label="Ingresos Brutos Totales" 
-                  value={ingresosBrutosTotales} 
+                  label="Ventas Reales Totales" 
+                  value={ingresosRealesTotales} 
                   icon={TrendingUp}
                   iconColor="text-emerald-400"
                 />
+
+                <ResultRowDark 
+                  label="Stock (Potencial Venta)" 
+                  value={stockTotal} 
+                  icon={Package}
+                  iconColor="text-amber-400"
+                />
                 
                 <ResultRowDark 
-                  label="Ganancia Bruta Total" 
-                  value={gananciaBrutaTotal} 
+                  label="Ganancia Bruta Real" 
+                  value={gananciaBrutaRealTotal} 
                   icon={DollarSign}
                   iconColor="text-emerald-400"
-                  highlight
+                />
+
+                <ResultRowDark 
+                  label="Ganancia Bruta Potencial" 
+                  value={gananciaBrutaPotencialTotal} 
+                  icon={DollarSign}
+                  iconColor="text-amber-400"
                 />
                 
                 <ResultRowDark 
@@ -286,46 +330,64 @@ export default function App() {
                   isNegative
                 />
                 
-                <div className="pt-6 mt-4 border-t border-stone-700">
-                  <div className={`p-5 rounded-xl relative overflow-hidden ${
-                    gananciaNetaTotal > 0 
+                <div className="pt-6 mt-4 border-t border-stone-700 space-y-4">
+                  {/* Real Results Card */}
+                  <div className={`p-4 rounded-xl relative overflow-hidden ${
+                    gananciaNetaRealTotal > 0 
                       ? 'bg-emerald-500/10 border border-emerald-500/30' 
-                      : gananciaNetaTotal < 0 
+                      : gananciaNetaRealTotal < 0 
                         ? 'bg-red-500/10 border border-red-500/30' 
+                        : 'bg-stone-800 border border-stone-700'
+                  }`}>
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">Resultado Real (Hoy)</span>
+                        <span className={`font-bold text-sm px-2 py-0.5 rounded ${
+                          margenRentabilidadNetaReal > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {formatPercent(margenRentabilidadNetaReal)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-black text-2xl ${
+                          gananciaNetaRealTotal > 0 ? 'text-emerald-400' : gananciaNetaRealTotal < 0 ? 'text-red-400' : 'text-white'
+                        }`}>
+                          {formatCurrency(gananciaNetaRealTotal)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Potential Results Card */}
+                  <div className={`p-5 rounded-xl relative overflow-hidden ${
+                    gananciaNetaPotencialTotal > 0 
+                      ? 'bg-emerald-500/20 border border-emerald-500/40' 
+                      : gananciaNetaPotencialTotal < 0 
+                        ? 'bg-red-500/20 border border-red-500/40' 
                         : 'bg-stone-800 border border-stone-700'
                   }`}>
                     {/* Decorative background glow */}
                     <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-20 ${
-                      gananciaNetaTotal > 0 ? 'bg-emerald-500' : gananciaNetaTotal < 0 ? 'bg-red-500' : 'bg-transparent'
+                      gananciaNetaPotencialTotal > 0 ? 'bg-emerald-500' : gananciaNetaPotencialTotal < 0 ? 'bg-red-500' : 'bg-transparent'
                     }`}></div>
 
                     <div className="relative z-10">
-                      <div className="mb-1">
-                        <span className="text-sm font-medium text-stone-300 uppercase tracking-wider">Ganancia Neta Total</span>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">Resultado Proyectado</span>
+                        <span className={`font-bold text-lg px-2 py-0.5 rounded ${
+                          margenRentabilidadNetaPotencial > 0 ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+                        }`}>
+                          {formatPercent(margenRentabilidadNetaPotencial)}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className={`font-black text-3xl ${
-                          gananciaNetaTotal > 0 ? 'text-emerald-400' : gananciaNetaTotal < 0 ? 'text-red-400' : 'text-white'
+                          gananciaNetaPotencialTotal > 0 ? 'text-emerald-400' : gananciaNetaPotencialTotal < 0 ? 'text-red-400' : 'text-white'
                         }`}>
-                          {formatCurrency(gananciaNetaTotal)}
+                          {formatCurrency(gananciaNetaPotencialTotal)}
                         </span>
                       </div>
-                    </div>
-                    
-                    <div className="mt-5 pt-4 border-t border-white/10 flex justify-between items-center relative z-10">
-                      <span className="font-medium text-stone-300 flex items-center">
-                        <Percent className="h-4 w-4 mr-1 opacity-70" />
-                        Margen Neto
-                      </span>
-                      <span className={`font-bold text-xl px-3 py-1 rounded-lg ${
-                         margenRentabilidadNeta > 0 
-                          ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                          : margenRentabilidadNeta < 0 
-                            ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
-                            : 'bg-stone-700 text-stone-300'
-                      }`}>
-                        {formatPercent(margenRentabilidadNeta)}
-                      </span>
+                      <p className="text-[10px] text-stone-400 mt-2 italic">Incluye ventas reales + valor de stock disponible.</p>
                     </div>
                   </div>
                 </div>
